@@ -40,11 +40,14 @@ public final class GateVpnService extends VpnService {
     public int onStartCommand(Intent intent, int flags, int startId) {
         startForeground(NOTIFICATION_ID, buildNotification());
         String action = intent == null ? ACTION_BLOCK : intent.getAction();
-        if (ACTION_RELEASE.equals(action)) {
-            releaseCurrentBoot();
+        String bootId = currentBootId();
+        if (bootId.isEmpty()) {
+            blockCurrentBoot();
+        } else if (ACTION_RELEASE.equals(action)) {
+            releaseCurrentBoot(bootId);
         } else if (ACTION_BLOCK.equals(action)) {
             blockCurrentBoot();
-        } else if (currentBootId().equals(releasedBootId())) {
+        } else if (bootId.equals(releasedBootId())) {
             releaseTunnel();
         } else {
             blockCurrentBoot();
@@ -73,8 +76,8 @@ public final class GateVpnService extends VpnService {
         }
     }
 
-    private void releaseCurrentBoot() {
-        devicePreferences().edit().putString(KEY_RELEASED_BOOT, currentBootId()).apply();
+    private void releaseCurrentBoot(String bootId) {
+        devicePreferences().edit().putString(KEY_RELEASED_BOOT, bootId).apply();
         releaseTunnel();
     }
 
@@ -98,10 +101,11 @@ public final class GateVpnService extends VpnService {
 
     private String currentBootId() {
         try (BufferedReader reader = new BufferedReader(new FileReader("/proc/sys/kernel/random/boot_id"))) {
-            return reader.readLine().trim();
+            String line = reader.readLine();
+            return line == null ? "" : line.trim();
         } catch (Throwable error) {
             Log.e("SamsungBootGate", "Cannot read boot ID", error);
-            return "unknown";
+            return "";
         }
     }
 
