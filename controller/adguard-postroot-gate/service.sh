@@ -41,8 +41,8 @@ fail_closed() {
     echo "$1"
     settings put secure always_on_vpn_lockdown 1
     block_gate
-    svc wifi disable
-    svc data disable
+    /system/bin/svc wifi disable
+    /system/bin/svc data disable
     exit 1
 }
 
@@ -50,13 +50,18 @@ if ! block_gate; then
     fail_closed "Gate block command failed"
 fi
 settings put secure always_on_vpn_lockdown 1
-am broadcast -a start -n "$ADGUARD_COMPONENT" --es password "$AGD_PASSWORD" --ez quiet true >/dev/null
-am start -n com.adguard.android/.ui.activity.SplashActivity >/dev/null 2>&1
+: >"$UI_XML"
+if uiautomator dump "$UI_XML" >/dev/null 2>&1 && grep -F 'Protection is enabled' "$UI_XML" >/dev/null 2>&1; then
+    echo "AdGuard is already running; skipping duplicate start"
+else
+    am broadcast -a start -n "$ADGUARD_COMPONENT" --es password "$AGD_PASSWORD" --ez quiet true >/dev/null
+    am start -n com.adguard.android/.ui.activity.SplashActivity >/dev/null 2>&1
+fi
 : >"$UI_XML"
 
 READY=0
 I=0
-while [ "$I" -lt 90 ]; do
+while [ "$I" -lt 180 ]; do
     if uiautomator dump "$UI_XML" >/dev/null 2>&1; then
         if grep -F 'Main protection switch on' "$UI_XML" >/dev/null 2>&1; then
             READY=1
@@ -75,9 +80,11 @@ if [ "$READY" != "1" ]; then
     fail_closed "AdGuard did not confirm a running state"
 fi
 
-echo "AdGuard confirmed running; enabling radios and releasing gate"
-svc wifi enable
-svc data enable
+echo "AdGuard confirmed running; allowing proxy startup to settle"
+sleep 8
+echo "Enabling radios and releasing gate"
+/system/bin/svc wifi enable
+/system/bin/svc data enable
 if ! settings put secure always_on_vpn_lockdown 0; then
     fail_closed "Cannot release lockdown"
 fi
