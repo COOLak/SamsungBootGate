@@ -1,0 +1,6 @@
+id=adguard_postroot_gate
+name=AdGuard Post-Root Gate for Samsung Galaxy
+version=v1.0
+versionCode=1
+author=COOLak
+description=Starts AdGuard only after KernelSU late-load, verifies protection, then releases Samsung Boot Gate. Fail-closed on errors.

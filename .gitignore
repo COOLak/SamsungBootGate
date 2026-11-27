@@ -5,3 +5,5 @@ app/key.jks
 local.properties
 *.jks
 *.keystore
+controller/adguard-postroot-gate.conf
+controller/*.zip

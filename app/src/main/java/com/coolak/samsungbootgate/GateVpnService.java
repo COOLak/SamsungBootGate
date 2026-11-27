@@ -42,6 +42,8 @@ public final class GateVpnService extends VpnService {
         String action = intent == null ? ACTION_BLOCK : intent.getAction();
         if (ACTION_RELEASE.equals(action)) {
             releaseCurrentBoot();
+        } else if (ACTION_BLOCK.equals(action)) {
+            blockCurrentBoot();
         } else if (currentBootId().equals(releasedBootId())) {
             releaseTunnel();
         } else {
