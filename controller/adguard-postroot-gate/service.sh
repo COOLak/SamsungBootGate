@@ -1,8 +1,9 @@
 #!/system/bin/sh
 
 LOG=/data/local/tmp/adguard-postroot-gate.log
-EVENTS=/data/local/tmp/adguard-postroot-events.log
-CONFIG=/data/adb/adguard-postroot-gate.conf
+UI_XML=/data/local/tmp/adguard-postroot-ui.xml
+MODDIR=${MODDIR:-/data/adb/modules/adguard_postroot_gate}
+CONFIG="$MODDIR/automation.conf"
 GATE_PACKAGE=com.coolak.samsungbootgate
 GATE_SERVICE="$GATE_PACKAGE/.GateVpnService"
 ADGUARD_COMPONENT=com.adguard.android/.receiver.AutomationReceiver
@@ -28,14 +29,6 @@ if [ -z "$AGD_PASSWORD" ]; then
     exit 1
 fi
 
-: >"$EVENTS"
-logcat -v time >"$EVENTS" 2>&1 &
-LOGGER=$!
-cleanup() {
-    kill "$LOGGER" 2>/dev/null || true
-}
-trap cleanup EXIT INT TERM
-
 release_gate() {
     am start-foreground-service -a com.coolak.samsungbootgate.RELEASE -n "$GATE_SERVICE"
 }
@@ -58,16 +51,21 @@ if ! block_gate; then
 fi
 settings put secure always_on_vpn_lockdown 1
 am broadcast -a start -n "$ADGUARD_COMPONENT" --es password "$AGD_PASSWORD" --ez quiet true >/dev/null
+am start -n com.adguard.android/.ui.activity.SplashActivity >/dev/null 2>&1
+: >"$UI_XML"
 
 READY=0
 I=0
 while [ "$I" -lt 90 ]; do
-    if grep -F 'new: [state=Running' "$EVENTS" >/dev/null 2>&1; then
-        READY=1
-        break
-    fi
-    if grep -F 'new: [state=Stopped' "$EVENTS" >/dev/null 2>&1; then
-        fail_closed "AdGuard reported a stopped state"
+    if uiautomator dump "$UI_XML" >/dev/null 2>&1; then
+        if grep -F 'Main protection switch on' "$UI_XML" >/dev/null 2>&1; then
+            READY=1
+            break
+        fi
+        if grep -F 'Protection is enabled' "$UI_XML" >/dev/null 2>&1; then
+            READY=1
+            break
+        fi
     fi
     I=$((I + 1))
     sleep 1
@@ -77,7 +75,9 @@ if [ "$READY" != "1" ]; then
     fail_closed "AdGuard did not confirm a running state"
 fi
 
-echo "AdGuard confirmed running; releasing gate"
+echo "AdGuard confirmed running; enabling radios and releasing gate"
+svc wifi enable
+svc data enable
 if ! settings put secure always_on_vpn_lockdown 0; then
     fail_closed "Cannot release lockdown"
 fi

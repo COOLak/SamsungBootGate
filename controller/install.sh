@@ -4,6 +4,7 @@ set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 ZIP="$HERE/AdGuardPostRootGate.zip"
 CONFIG="$HERE/adguard-postroot-gate.conf"
+BUILD="$HERE/build/adguard_postroot_gate"
 
 if [ ! -r "$CONFIG" ]; then
     echo "Missing $CONFIG" >&2
@@ -30,12 +31,24 @@ for PACKAGE in com.coolak.samsungbootgate com.adguard.android; do
     esac
 done
 
+rm -rf "$BUILD"
+mkdir -p "$BUILD"
+cp -R "$HERE/adguard-postroot-gate/." "$BUILD/"
+cp "$CONFIG" "$BUILD/automation.conf"
+chmod 600 "$BUILD/automation.conf"
 (
-    cd "$HERE/adguard-postroot-gate"
+    cd "$BUILD"
     zip -q -r "$ZIP" .
 )
 adb push "$ZIP" /data/local/tmp/AdGuardPostRootGate.zip >/dev/null
-adb push "$CONFIG" /data/local/tmp/adguard-postroot-gate.conf >/dev/null
-adb shell su -c 'set -e; /data/adb/ksu/bin/ksud module install /data/local/tmp/AdGuardPostRootGate.zip; cp /data/local/tmp/adguard-postroot-gate.conf /data/adb/adguard-postroot-gate.conf; chmod 600 /data/adb/adguard-postroot-gate.conf; rm -f /data/local/tmp/AdGuardPostRootGate.zip /data/local/tmp/adguard-postroot-gate.conf'
-adb shell su -c 'test -r /data/adb/modules/adguard_postroot_gate/service.sh && test -r /data/adb/adguard-postroot-gate.conf'
-echo "AdGuard post-root controller installed; it runs after the next KernelSU late-load."
+adb shell "su -c 'set -e; rm -rf /data/adb/modules_update/adguard_postroot_gate /data/adb/modules/adguard_postroot_gate; mkdir -p /data/adb/modules/adguard_postroot_gate; /data/adb/ksu/bin/busybox unzip -o /data/local/tmp/AdGuardPostRootGate.zip -d /data/adb/modules/adguard_postroot_gate; chmod 600 /data/adb/modules/adguard_postroot_gate/automation.conf; if command -v restorecon >/dev/null 2>&1; then restorecon -R /data/adb/modules/adguard_postroot_gate; fi; rm -f /data/local/tmp/AdGuardPostRootGate.zip'"
+MODULES=$(adb shell "su -c '/data/local/tmp/ksud-s25u-kdp module list'")
+case "$MODULES" in
+    *'"id": "adguard_postroot_gate"'*)
+        echo "AdGuard post-root controller installed; it runs after the next KernelSU late-load."
+        ;;
+    *)
+        echo "Controller is missing from the KernelSU module list" >&2
+        exit 1
+        ;;
+esac

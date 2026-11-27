@@ -7,3 +7,4 @@ local.properties
 *.keystore
 controller/adguard-postroot-gate.conf
 controller/*.zip
+controller/build/
