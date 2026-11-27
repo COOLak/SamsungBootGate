@@ -44,7 +44,19 @@ block_gate() {
     am start-foreground-service -a com.coolak.samsungbootgate.BLOCK -n "$GATE_SERVICE"
 }
 
-block_gate
+fail_closed() {
+    echo "$1"
+    settings put secure always_on_vpn_lockdown 1
+    block_gate
+    svc wifi disable
+    svc data disable
+    exit 1
+}
+
+if ! block_gate; then
+    fail_closed "Gate block command failed"
+fi
+settings put secure always_on_vpn_lockdown 1
 am broadcast -a start -n "$ADGUARD_COMPONENT" --es password "$AGD_PASSWORD" --ez quiet true >/dev/null
 
 READY=0
@@ -55,30 +67,32 @@ while [ "$I" -lt 90 ]; do
         break
     fi
     if grep -F 'new: [state=Stopped' "$EVENTS" >/dev/null 2>&1; then
-        echo "AdGuard reported a stopped state"
-        exit 1
+        fail_closed "AdGuard reported a stopped state"
     fi
     I=$((I + 1))
     sleep 1
 done
 
 if [ "$READY" != "1" ]; then
-    echo "AdGuard did not confirm a running state"
-    exit 1
+    fail_closed "AdGuard did not confirm a running state"
 fi
 
 echo "AdGuard confirmed running; releasing gate"
+if ! settings put secure always_on_vpn_lockdown 0; then
+    fail_closed "Cannot release lockdown"
+fi
 if ! release_gate; then
-    echo "Gate release command failed"
-    exit 1
+    fail_closed "Gate release command failed"
 fi
 
-sleep 2
-if curl -fsS -o /dev/null --max-time 8 https://connectivitycheck.gstatic.com/generate_204; then
-    echo "Internet verification passed after AdGuard"
-    exit 0
-fi
+I=0
+while [ "$I" -lt 10 ]; do
+    if curl -fsS -o /dev/null --connect-timeout 3 --max-time 5 https://connectivitycheck.gstatic.com/generate_204; then
+        echo "Internet verification passed after AdGuard"
+        exit 0
+    fi
+    I=$((I + 1))
+    sleep 1
+done
 
-echo "Internet verification failed; blocking again"
-block_gate
-exit 1
+fail_closed "Internet verification failed; blocking again"
