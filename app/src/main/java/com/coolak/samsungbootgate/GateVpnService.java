@@ -39,7 +39,7 @@ public final class GateVpnService extends VpnService {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         startForeground(NOTIFICATION_ID, buildNotification());
-        String action = intent == null ? ACTION_BLOCK : intent.getAction();
+        String action = intent == null ? null : intent.getAction();
         String bootId = currentBootId();
         if (bootId.isEmpty()) {
             blockCurrentBoot();
@@ -56,7 +56,9 @@ public final class GateVpnService extends VpnService {
     }
 
     private void blockCurrentBoot() {
-        closeTunnel();
+        if (tunnel != null) {
+            return;
+        }
         try {
             tunnel = new Builder()
                 .setSession("Samsung Boot Gate")
@@ -77,7 +79,12 @@ public final class GateVpnService extends VpnService {
     }
 
     private void releaseCurrentBoot(String bootId) {
-        devicePreferences().edit().putString(KEY_RELEASED_BOOT, bootId).apply();
+        boolean stored = devicePreferences().edit().putString(KEY_RELEASED_BOOT, bootId).commit();
+        if (!stored) {
+            Log.e("SamsungBootGate", "Cannot persist released boot; staying blocked");
+            blockCurrentBoot();
+            return;
+        }
         releaseTunnel();
     }
 
