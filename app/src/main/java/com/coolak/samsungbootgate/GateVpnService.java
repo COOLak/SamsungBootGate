@@ -85,6 +85,7 @@ public final class GateVpnService extends VpnService {
     }
 
     private void blockCurrentBoot() {
+        Settings.Secure.putString(getContentResolver(), "always_on_vpn_package", "com.coolak.samsungbootgate");
         Settings.Secure.putInt(getContentResolver(), "always_on_vpn_lockdown", 1);
         if (tunnel != null && !adGuardAllowed) {
             return;
@@ -133,6 +134,7 @@ public final class GateVpnService extends VpnService {
     }
 
     private void establishReleasedTunnel() {
+        Settings.Secure.putString(getContentResolver(), "always_on_vpn_package", null);
         Settings.Secure.putInt(getContentResolver(), "always_on_vpn_lockdown", 0);
         closeTunnel();
         stopForeground(true);
