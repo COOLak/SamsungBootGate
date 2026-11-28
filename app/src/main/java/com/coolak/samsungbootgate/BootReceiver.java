@@ -24,5 +24,13 @@ public final class BootReceiver extends BroadcastReceiver {
             return;
         }
         Log.i("SamsungBootGate", "Always-on boot gate rearmed");
+        if (Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(intent.getAction())) {
+            try {
+                GateVpnService.requestBlock(context);
+                Log.i("SamsungBootGate", "Direct-boot blocking tunnel requested");
+            } catch (Throwable error) {
+                Log.e("SamsungBootGate", "Cannot start direct-boot blocking tunnel", error);
+            }
+        }
     }
 }
