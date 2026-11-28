@@ -46,6 +46,17 @@ protection_is_disabled() {
     grep -F 'name="last_time_protection_enabled" value="false"' "$ADGUARD_PREFS" >/dev/null 2>&1
 }
 
+ipv4_proxy_rules_active() {
+    iptables -t nat -S ADGUARD_OUTPUT 2>/dev/null | grep -F 'tcp' | grep -F -- '-j REDIRECT' >/dev/null 2>&1
+}
+
+ipv6_proxy_rules_active() {
+    if ip6tables -t mangle -S ADGUARD_OUTPUT 2>/dev/null | grep -F 'tcp' | grep -F 'MARK --set-xmark 0x1b' >/dev/null 2>&1 && ip6tables -S ADGUARD_INPUT 2>/dev/null | grep -F 'mark match 0x1b' | grep -F 'tcp' | grep -F 'ACCEPT' >/dev/null 2>&1; then
+        return 0
+    fi
+    ip6tables -t nat -S ADGUARD_OUTPUT 2>/dev/null | grep -F 'tcp' | grep -F -- '-j REDIRECT' >/dev/null 2>&1
+}
+
 if [ "$(id -u)" != "0" ]; then
     echo "root UID is unavailable"
     exit 1
@@ -142,37 +153,11 @@ if ! routing_is_automatic_proxy; then
     fail_closed "AdGuard protection is not using Automatic proxy"
 fi
 
-# Protection is enabled now. Let only AdGuard reach upstream while every
-# other package stays behind the blocking tunnel until both NAT families live.
-if ! am start-foreground-service -a com.coolak.samsungbootgate.ALLOW_ADGUARD -n "$GATE_SERVICE"; then
-    fail_closed "Cannot enable AdGuard-only upstream"
-fi
-echo "Protection Enabled; upstream allowed only to AdGuard until NAT is ready"
-
-RULES_READY=0
-I=0
-while [ "$I" -lt 180 ]; do
-    if iptables -S ADGUARD_OUTPUT 2>/dev/null | grep -F 'tcp' | grep -F -- '-j REDIRECT' >/dev/null 2>&1 && ip6tables -S ADGUARD_OUTPUT 2>/dev/null | grep -F 'tcp' | grep -F -- '-j REDIRECT' >/dev/null 2>&1; then
-        RULES_READY=1
-        break
-    fi
-    I=$((I + 1))
-    sleep 1
-done
-if [ "$RULES_READY" != "1" ]; then
-    stop_adguard
-    fail_closed "Automatic proxy NAT rules are not active"
-fi
-
-echo "Protection Enabled with Automatic proxy and live NAT rules; allowing startup to settle"
-sleep 8
+echo "Protection Enabled with Automatic proxy; keeping the gate closed during settle"
+sleep 15
 if ! routing_is_automatic_proxy || ! protection_is_enabled; then
     stop_adguard
     fail_closed "AdGuard changed state before network release"
-fi
-if ! iptables -S ADGUARD_OUTPUT 2>/dev/null | grep -F 'tcp' | grep -F -- '-j REDIRECT' >/dev/null 2>&1 || ! ip6tables -S ADGUARD_OUTPUT 2>/dev/null | grep -F 'tcp' | grep -F -- '-j REDIRECT' >/dev/null 2>&1; then
-    stop_adguard
-    fail_closed "Automatic proxy NAT rules disappeared before network release"
 fi
 if ! release_gate; then
     fail_closed "Gate release command failed"
