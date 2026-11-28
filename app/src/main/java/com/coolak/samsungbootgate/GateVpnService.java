@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.IpPrefix;
 import android.net.VpnService;
 import android.os.ParcelFileDescriptor;
 import android.util.Log;
@@ -66,7 +67,20 @@ public final class GateVpnService extends VpnService {
             .addAddress("10.66.0.2", 32)
             .addRoute("0.0.0.0", 0)
             .addAddress("fd66::2", 128)
-            .addRoute("::", 0);
+            .addRoute("::", 0)
+            // Shizuku needs only loopback, LAN and mDNS to start. Public
+            // Internet remains blackholed until Protection Enabled.
+            .excludeRoute(new IpPrefix("127.0.0.0", 8))
+            .excludeRoute(new IpPrefix("10.0.0.0", 8))
+            .excludeRoute(new IpPrefix("100.64.0.0", 10))
+            .excludeRoute(new IpPrefix("172.16.0.0", 12))
+            .excludeRoute(new IpPrefix("192.168.0.0", 16))
+            .excludeRoute(new IpPrefix("169.254.0.0", 16))
+            .excludeRoute(new IpPrefix("224.0.0.0", 4))
+            .excludeRoute(new IpPrefix("::1", 128))
+            .excludeRoute(new IpPrefix("fc00::", 7))
+            .excludeRoute(new IpPrefix("fe80::", 10))
+            .excludeRoute(new IpPrefix("ff00::", 8));
     }
 
     private void blockCurrentBoot() {
