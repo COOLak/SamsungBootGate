@@ -16,12 +16,14 @@ import java.io.IOException;
 
 public final class GateVpnService extends VpnService {
     public static final String ACTION_BLOCK = "com.coolak.samsungbootgate.BLOCK";
+    public static final String ACTION_ALLOW_ADGUARD = "com.coolak.samsungbootgate.ALLOW_ADGUARD";
     public static final String ACTION_RELEASE = "com.coolak.samsungbootgate.RELEASE";
     private static final String CHANNEL = "gate";
     private static final String PREFS = "boot_state";
     private static final String KEY_RELEASED_BOOT = "released_boot";
     private static final int NOTIFICATION_ID = 1;
     private ParcelFileDescriptor tunnel;
+    private boolean adGuardAllowed;
 
     public static void requestBlock(Context context) {
         start(context, ACTION_BLOCK);
@@ -45,6 +47,8 @@ public final class GateVpnService extends VpnService {
             blockCurrentBoot();
         } else if (ACTION_RELEASE.equals(action)) {
             releaseCurrentBoot(bootId);
+        } else if (ACTION_ALLOW_ADGUARD.equals(action)) {
+            allowAdGuardCurrentBoot();
         } else if (ACTION_BLOCK.equals(action)) {
             blockCurrentBoot();
         } else if (bootId.equals(releasedBootId())) {
@@ -55,25 +59,49 @@ public final class GateVpnService extends VpnService {
         return START_STICKY;
     }
 
+    private Builder baseBuilder() {
+        return new Builder()
+            .setSession("Samsung Boot Gate")
+            .setBlocking(true)
+            .addAddress("10.66.0.2", 32)
+            .addRoute("0.0.0.0", 0)
+            .addAddress("fd66::2", 128)
+            .addRoute("::", 0);
+    }
+
     private void blockCurrentBoot() {
-        if (tunnel != null) {
+        if (tunnel != null && !adGuardAllowed) {
             return;
         }
+        closeTunnel();
         try {
-            tunnel = new Builder()
-                .setSession("Samsung Boot Gate")
-                .setBlocking(true)
-                .addAddress("10.66.0.2", 32)
-                .addRoute("0.0.0.0", 0)
-                .addAddress("fd66::2", 128)
-                .addRoute("::", 0)
-                .establish();
+            tunnel = baseBuilder().establish();
             if (tunnel == null) {
                 throw new IOException("VpnService.Builder.establish returned null");
             }
             Log.i("SamsungBootGate", "BLOCKED boot=" + currentBootId());
         } catch (Throwable error) {
             Log.e("SamsungBootGate", "Failed to establish blocking VPN", error);
+            stopSelf();
+        }
+    }
+
+    private void allowAdGuardCurrentBoot() {
+        if (tunnel != null && adGuardAllowed) {
+            return;
+        }
+        closeTunnel();
+        try {
+            tunnel = baseBuilder()
+                .addDisallowedApplication("com.adguard.android")
+                .establish();
+            if (tunnel == null) {
+                throw new IOException("VpnService.Builder.establish returned null");
+            }
+            adGuardAllowed = true;
+            Log.i("SamsungBootGate", "ADGUARD_UPSTREAM_ALLOWED boot=" + currentBootId());
+        } catch (Throwable error) {
+            Log.e("SamsungBootGate", "Failed to allow only AdGuard upstream", error);
             stopSelf();
         }
     }
@@ -104,6 +132,7 @@ public final class GateVpnService extends VpnService {
             }
             tunnel = null;
         }
+        adGuardAllowed = false;
     }
 
     private String currentBootId() {

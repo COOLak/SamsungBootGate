@@ -42,7 +42,7 @@ chmod 600 "$BUILD/automation.conf"
 )
 adb push "$ZIP" /data/local/tmp/AdGuardPostRootGate.zip >/dev/null
 adb shell "su -c 'set -e; rm -rf /data/adb/modules_update/adguard_postroot_gate /data/adb/modules/adguard_postroot_gate; mkdir -p /data/adb/modules/adguard_postroot_gate; /data/adb/ksu/bin/busybox unzip -o /data/local/tmp/AdGuardPostRootGate.zip -d /data/adb/modules/adguard_postroot_gate; chmod 600 /data/adb/modules/adguard_postroot_gate/automation.conf; if command -v restorecon >/dev/null 2>&1; then restorecon -R /data/adb/modules/adguard_postroot_gate; fi; rm -f /data/local/tmp/AdGuardPostRootGate.zip'"
-MODULES=$(adb shell "su -c '/data/local/tmp/ksud-s25u-kdp module list'")
+MODULES=$(adb shell "su -c '/data/adb/ksud module list'")
 case "$MODULES" in
     *'"id": "adguard_postroot_gate"'*)
         echo "AdGuard post-root controller installed; it runs after the next KernelSU late-load."
