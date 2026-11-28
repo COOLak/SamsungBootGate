@@ -9,6 +9,7 @@ import android.content.SharedPreferences;
 import android.net.IpPrefix;
 import android.net.VpnService;
 import android.os.ParcelFileDescriptor;
+import android.provider.Settings;
 import android.util.Log;
 
 import java.io.BufferedReader;
@@ -84,6 +85,7 @@ public final class GateVpnService extends VpnService {
     }
 
     private void blockCurrentBoot() {
+        Settings.Secure.putInt(getContentResolver(), "always_on_vpn_lockdown", 1);
         if (tunnel != null && !adGuardAllowed) {
             return;
         }
@@ -131,26 +133,11 @@ public final class GateVpnService extends VpnService {
     }
 
     private void establishReleasedTunnel() {
+        Settings.Secure.putInt(getContentResolver(), "always_on_vpn_lockdown", 0);
         closeTunnel();
-        try {
-            Builder builder = baseBuilder();
-            for (android.content.pm.ApplicationInfo app : getPackageManager().getInstalledApplications(0)) {
-                try {
-                    builder.addDisallowedApplication(app.packageName);
-                } catch (android.content.pm.PackageManager.NameNotFoundException error) {
-                    Log.w("SamsungBootGate", "Cannot exclude " + app.packageName, error);
-                }
-            }
-            tunnel = builder.establish();
-            if (tunnel == null) {
-                throw new IOException("VpnService.Builder.establish returned null");
-            }
-            stopForeground(true);
-            Log.i("SamsungBootGate", "RELEASED boot=" + currentBootId());
-        } catch (Throwable error) {
-            Log.e("SamsungBootGate", "Failed to establish released VPN", error);
-            stopSelf();
-        }
+        stopForeground(true);
+        stopSelf();
+        Log.i("SamsungBootGate", "RELEASED boot=" + currentBootId());
     }
 
     private void closeTunnel() {
