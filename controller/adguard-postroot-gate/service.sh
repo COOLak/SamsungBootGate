@@ -108,25 +108,8 @@ if ! routing_is_automatic_proxy; then
     fail_closed "AdGuard is not configured for Automatic proxy; refusing to start it"
 fi
 
-# Any protection that preceded KernelSU is stopped. The only start below is
-# issued by this root controller after the gate and routing mode are verified.
-if protection_is_enabled; then
-    stop_adguard
-fi
-STOPPED=0
-I=0
-while [ "$I" -lt 30 ]; do
-    if protection_is_disabled; then
-        STOPPED=1
-        break
-    fi
-    I=$((I + 1))
-    sleep 1
-done
-if [ "$STOPPED" != "1" ]; then
-    fail_closed "AdGuard did not stop before the root-controlled start"
-fi
-
+# The only start is issued here by the root controller after the gate and
+# routing mode are verified. Repeating start is idempotent, unlike stop/start.
 am broadcast -a start -n "$ADGUARD_COMPONENT" --es password "$AGD_PASSWORD" --ez quiet true >/dev/null
 
 READY=0
