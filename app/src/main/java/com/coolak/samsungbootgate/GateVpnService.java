@@ -60,7 +60,11 @@ public final class GateVpnService extends VpnService {
         return START_STICKY;
     }
 
-    private Builder baseBuilder() {
+    private IpPrefix prefix(String address, int bits) throws java.net.UnknownHostException {
+        return new IpPrefix(java.net.InetAddress.getByName(address), bits);
+    }
+
+    private Builder baseBuilder() throws java.net.UnknownHostException {
         return new Builder()
             .setSession("Samsung Boot Gate")
             .setBlocking(true)
@@ -70,17 +74,17 @@ public final class GateVpnService extends VpnService {
             .addRoute("::", 0)
             // Shizuku needs only loopback, LAN and mDNS to start. Public
             // Internet remains blackholed until Protection Enabled.
-            .excludeRoute(new IpPrefix("127.0.0.0", 8))
-            .excludeRoute(new IpPrefix("10.0.0.0", 8))
-            .excludeRoute(new IpPrefix("100.64.0.0", 10))
-            .excludeRoute(new IpPrefix("172.16.0.0", 12))
-            .excludeRoute(new IpPrefix("192.168.0.0", 16))
-            .excludeRoute(new IpPrefix("169.254.0.0", 16))
-            .excludeRoute(new IpPrefix("224.0.0.0", 4))
-            .excludeRoute(new IpPrefix("::1", 128))
-            .excludeRoute(new IpPrefix("fc00::", 7))
-            .excludeRoute(new IpPrefix("fe80::", 10))
-            .excludeRoute(new IpPrefix("ff00::", 8));
+            .excludeRoute(prefix("127.0.0.0", 8))
+            .excludeRoute(prefix("10.0.0.0", 8))
+            .excludeRoute(prefix("100.64.0.0", 10))
+            .excludeRoute(prefix("172.16.0.0", 12))
+            .excludeRoute(prefix("192.168.0.0", 16))
+            .excludeRoute(prefix("169.254.0.0", 16))
+            .excludeRoute(prefix("224.0.0.0", 4))
+            .excludeRoute(prefix("::1", 128))
+            .excludeRoute(prefix("fc00::", 7))
+            .excludeRoute(prefix("fe80::", 10))
+            .excludeRoute(prefix("ff00::", 8));
     }
 
     private void blockCurrentBoot() {
