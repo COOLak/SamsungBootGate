@@ -75,9 +75,6 @@ public final class GateVpnService extends VpnService {
             .addRoute("::", 0)
             // Shizuku needs only loopback, LAN and mDNS to start. Public
             // Internet remains blackholed until Protection Enabled.
-            .excludeRoute(prefix("10.0.0.0", 8))
-            .excludeRoute(prefix("100.64.0.0", 10))
-            .excludeRoute(prefix("172.16.0.0", 12))
             .excludeRoute(prefix("192.168.0.0", 16))
             .excludeRoute(prefix("169.254.0.0", 16))
             .excludeRoute(prefix("fc00::", 7))
